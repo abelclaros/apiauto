@@ -20,7 +20,8 @@ class TodoBase(metaclass=Singleton):
         """
         response = RestClient().send_request("get", session=self.session,
                                              url=self.url_projects, headers=HEADERS)
-        if len(response.json()) == 0:
+        # if len(response.json()) == 0:
+        if not response.get("body"):
             raise AssertionError("No projects available")
 
         return response
@@ -28,7 +29,8 @@ class TodoBase(metaclass=Singleton):
     def get_all_sections(self):
         response = RestClient().send_request("get", session=self.session,
                                              url=self.url_sections, headers=HEADERS)
-        if len(response.json()) == 0:
+        # if len(response.json()) == 0:
+        if not response.get("body"):
             raise AssertionError("No sections available")
 
         return response
@@ -36,7 +38,7 @@ class TodoBase(metaclass=Singleton):
     def get_all_tasks(self):
         response = RestClient().send_request("get", session=self.session,
                                              url=self.url_tasks, headers=HEADERS)
-        if len(response.json()) == 0:
+        if not response.get("body"):
             raise AssertionError("No tasks available")
 
         return response
