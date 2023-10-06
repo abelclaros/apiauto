@@ -13,6 +13,7 @@ from api.validate_response import ValidateResponse
 from config.config import HEADERS
 from utils.logger import get_logger
 from utils.rest_client import RestClient
+from utils.cleanup import CleanUp
 
 LOGGER = get_logger(__name__, logging.DEBUG)
 
@@ -32,13 +33,23 @@ class Projects(unittest.TestCase):
         cls.project_id_update = ""
         cls.projects_list = []
 
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Delete all projects uses CleanUp library
+        :return:
+        Clean SUT
+        """
+        CleanUp.projects()
+
     def test_get_all_projects(self):
         """
         Test get all projects
         """
         response = RestClient().send_request(method_name="get", session=self.session,
                                              url=self.url_base, headers=HEADERS)
-        ValidateResponse().validate_response(actual_response=response, method="get", expected_status_code=200,
+        ValidateResponse().validate_response(actual_response=response, method="get",
+                                             expected_status_code=200,
                                              feature="projects")
 
     @params("Project 2", "1111111")
@@ -56,7 +67,8 @@ class Projects(unittest.TestCase):
         project_id = response["body"]["id"]
         LOGGER.debug("Project id generated: %s", project_id)
         self.projects_list.append(project_id)
-        ValidateResponse().validate_response(actual_response=response, method="post", expected_status_code=200,
+        ValidateResponse().validate_response(actual_response=response, method="post",
+                                             expected_status_code=200,
                                              feature="project")
 
     def test_get_project(self):
@@ -69,7 +81,8 @@ class Projects(unittest.TestCase):
         response = RestClient().send_request("get", session=self.session,
                                              url=url, headers=HEADERS)
         self.projects_list.append(project_id)
-        ValidateResponse().validate_response(actual_response=response, method="get", expected_status_code=200,
+        ValidateResponse().validate_response(actual_response=response, method="get",
+                                             expected_status_code=200,
                                              feature="project")
 
     def test_delete_project(self):
@@ -82,7 +95,8 @@ class Projects(unittest.TestCase):
         url = f"{self.url_base}/{project_id}"
         response = RestClient().send_request(method_name="delete", session=self.session, url=url,
                                              headers=HEADERS)
-        ValidateResponse().validate_response(actual_response=response, method="delete", expected_status_code=204,
+        ValidateResponse().validate_response(actual_response=response, method="delete",
+                                             expected_status_code=204,
                                              feature="project")
 
     def test_update_project(self):
@@ -100,10 +114,17 @@ class Projects(unittest.TestCase):
         response = RestClient().send_request("post", session=self.session, url=url,
                                              headers=HEADERS, data=data_update)
         self.projects_list.append(project_id_update)
-        ValidateResponse().validate_response(actual_response=response, method="post", expected_status_code=200,
+        ValidateResponse().validate_response(actual_response=response, method="post",
+                                             expected_status_code=200,
                                              feature="project")
 
     def create_project(self, name_project):
+        """
+        Creates a project on demand
+        :param name_project: Name of the project
+        :return:
+        response is a dictionary [body, headers, status]
+        """
         body_project = {
             "name": name_project
         }
@@ -111,12 +132,12 @@ class Projects(unittest.TestCase):
                                              headers=HEADERS, data=body_project)
         return response
 
-    @classmethod
-    def tearDownClass(cls):
-        print("tearDown Class")
-        # delete projects created
-        for project in cls.projects_list:
-            url = f"{cls.url_base}/{project}"
-            RestClient().send_request(method_name="delete", session=cls.session, url=url,
-                                      headers=HEADERS)
-            LOGGER.info("Deleting project: %s", project)
+    # @classmethod
+    # def tearDownClass(cls):
+    #     print("tearDown Class")
+    #     # delete projects created
+    #     for project in cls.projects_list:
+    #         url = f"{cls.url_base}/{project}"
+    #         RestClient().send_request(method_name="delete", session=cls.session, url=url,
+    #                                   headers=HEADERS)
+    #         LOGGER.info("Deleting project: %s", project)
