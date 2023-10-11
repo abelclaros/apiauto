@@ -1,0 +1,267 @@
+Index: api/projects.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"\"\"\nA class to test projects API from todoist\n\n...\n\nAttributes\n----------\n\n\nMethods\n-------\n\n\"\"\"\nimport logging\nimport unittest\nimport requests\nfrom nose2.tools import params\n\nfrom config.config import TOKEN_TODO\nfrom utils.logger import get_logger\n\n\nLOGGER = get_logger(__name__, logging.INFO)\n\n\nclass Projects(unittest.TestCase):\n    \"\"\"\nA class to test projects API from todoist\n\n...\n\nAttributes\n----------\n\n\nMethods\n-------\n\n\"\"\"\n\n    @classmethod\n    def setUpClass(cls):\n        \"\"\"\n        Setup Class only executed one time\n        \"\"\"\n        print(\"Setup Class\")\n        cls.token = TOKEN_TODO\n\n        print(\"Token from .env file: \", cls.token)\n        cls.headers = {\n            \"Authorization\": f\"Bearer {cls.token}\"\n        }\n        cls.url_base = \"https://api.todoist.com/rest/v2/projects\"\n\n        # create project to be used in tests\n        body_project = {\n            \"name\": \"Project 0\"\n        }\n        response = requests.post(cls.url_base, headers=cls.headers, data=body_project, timeout=15)\n\n        cls.project_id = response.json()[\"id\"]\n        cls.project_id_update = \"\"\n        cls.projects_list = []\n\n    def test_get_all_projects(self):\n        \"\"\"\n        Test get all projects\n        \"\"\"\n        response = requests.get(self.url_base, headers=self.headers, timeout=15)\n        assert response.status_code == 200\n\n    @params(\"Project 2\", \"1111111\", \"!@$$@$!@$\")\n    def test_create_project(self, name_project):\n        \"\"\"\n        Test for create project\n        \"\"\"\n        body_project = {\n            \"name\": name_project\n        }\n        response = requests.post(self.url_base, headers=self.headers, data=body_project, timeout=15)\n        LOGGER.info(\"Response for create project: %s\", response.json())\n        self.project_id_update = response.json()[\"id\"]\n        LOGGER.debug(\"Project id generated: %s\", self.project_id_update)\n        self.projects_list.append(self.project_id_update)\n        assert response.status_code == 200\n\n    def test_get_project(self):\n        \"\"\"\n        Test get Project\n        \"\"\"\n        url = f\"{self.url_base}/{self.project_id}\"\n        response = requests.get(url, headers=self.headers, timeout=15)\n        print(response.json())\n        assert response.status_code == 200\n\n    def test_delete_project(self):\n        \"\"\"\n        Deletes the project pointed.\n\n        Parameters:\n                project_id(String): id of the project to be deleted\n\n        Returns:\n        :return:\n        \"\"\"\n\n        url = f\"{self.url_base}/{self.project_id}\"\n        print(f\"Test Delete: {self.project_id}\")\n        response = requests.delete(url, headers=self.headers, timeout=15)\n        # validate project has been deleted\n        assert response.status_code == 204\n\n    def test_update_project(self):\n        \"\"\"\n        Updates the project pointed.\n\n        Parameters:\n            project_id(String): id of the project to be updated\n\n        Returns:\n        :return:\n        \"\"\"\n        url = f\"{self.url_base}/{self.project_id_update}\"\n        data_update = {\n            \"name\": \"Project 2\",\n            \"color\": \"red\"\n        }\n        response = requests.post(url, headers=self.headers, data=data_update, timeout=15)\n        print(response.json())\n        assert response.status_code == 200\n\n    @classmethod\n    def tearDownClass(cls):\n        print(\"tearDown Class\")\n        # delete projects created\n        for project in cls.projects_list:\n            url = f\"{cls.url_base}/{project}\"\n            requests.delete(url, headers=cls.headers, timeout=15)\n            LOGGER.info(\"Deleting project: %s\", project)\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/api/projects.py b/api/projects.py
+--- a/api/projects.py	(revision 887891cd99de86325b1a3542cec4bfd4bd2b496b)
++++ b/api/projects.py	(date 1695703976483)
+@@ -18,7 +18,7 @@
+ 
+ from config.config import TOKEN_TODO
+ from utils.logger import get_logger
+-
++from utils.rest_client import RestClient
+ 
+ LOGGER = get_logger(__name__, logging.INFO)
+ 
+@@ -56,8 +56,9 @@
+         body_project = {
+             "name": "Project 0"
+         }
+-        response = requests.post(cls.url_base, headers=cls.headers, data=body_project, timeout=15)
+-
++        response = requests.post(cls.url_base, headers=cls.headers, data=body_project)
++        cls.rest_client = RestClient()
++        cls.session = requests.Session()
+         cls.project_id = response.json()["id"]
+         cls.project_id_update = ""
+         cls.projects_list = []
+@@ -66,7 +67,8 @@
+         """
+         Test get all projects
+         """
+-        response = requests.get(self.url_base, headers=self.headers, timeout=15)
++        response = self.rest_client.send_request("get", session=self.session,
++                                                 url=self.url_base, headers=self.headers)
+         assert response.status_code == 200
+ 
+     @params("Project 2", "1111111", "!@$$@$!@$")
+@@ -77,10 +79,11 @@
+         body_project = {
+             "name": name_project
+         }
+-        response = requests.post(self.url_base, headers=self.headers, data=body_project, timeout=15)
+-        LOGGER.info("Response for create project: %s", response.json())
++        response = self.rest_client.send_request("post", session=self.session, url=self.url_base, headers=self.headers,
++                                                 data=body_project)
++        # LOGGER.info("Response for create project: %s", response.json())
+         self.project_id_update = response.json()["id"]
+-        LOGGER.debug("Project id generated: %s", self.project_id_update)
++        # LOGGER.debug("Project id generated: %s", self.project_id_update)
+         self.projects_list.append(self.project_id_update)
+         assert response.status_code == 200
+ 
+@@ -89,8 +92,9 @@
+         Test get Project
+         """
+         url = f"{self.url_base}/{self.project_id}"
+-        response = requests.get(url, headers=self.headers, timeout=15)
+-        print(response.json())
++        response = self.rest_client.send_request("get", session=self.session,
++                                                 url=self.url_base, headers=self.headers)
++        # print(response.json())
+         assert response.status_code == 200
+ 
+     def test_delete_project(self):
+@@ -106,7 +110,8 @@
+ 
+         url = f"{self.url_base}/{self.project_id}"
+         print(f"Test Delete: {self.project_id}")
+-        response = requests.delete(url, headers=self.headers, timeout=15)
++        response = self.rest_client.send_request("delete", session=self.session,
++                                                 url=url, headers=self.headers)
+         # validate project has been deleted
+         assert response.status_code == 204
+ 
+@@ -125,8 +130,10 @@
+             "name": "Project 2",
+             "color": "red"
+         }
+-        response = requests.post(url, headers=self.headers, data=data_update, timeout=15)
+-        print(response.json())
++        response = self.rest_client.send_request("post", session=self.session,
++                                                 url=self.url_base,
++                                                 headers=self.headers, data=data_update)
++        # print(response.json())
+         assert response.status_code == 200
+ 
+     @classmethod
+@@ -135,5 +142,5 @@
+         # delete projects created
+         for project in cls.projects_list:
+             url = f"{cls.url_base}/{project}"
+-            requests.delete(url, headers=cls.headers, timeout=15)
+-            LOGGER.info("Deleting project: %s", project)
++            cls.rest_client.send_request("delete", session=cls.session, url=url, headers=cls.headers)
++            # LOGGER.info("Deleting project: %s", project)
+Index: utils/singleton.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/utils/singleton.py b/utils/singleton.py
+new file mode 100644
+--- /dev/null	(date 1695815083129)
++++ b/utils/singleton.py	(date 1695815083129)
+@@ -0,0 +1,19 @@
++class Singleton(type)
++    """
++    
++    """
++
++    _instances = {}
++
++
++    def __call__(cls, *args, **kwargs):
++        """
++
++        :param args:    dict    Arguments passed to instance
++        :param kwargs:  dict    Arguments passed to create the instance
++        :return:        object of instanced class
++        """
++        if cls not in cls._instances:
++            cls._instances[cls] = super().__call__(*args, **kwargs)
++        return cls._instances[cls]
++
+Index: unittests/test_rest_client.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/unittests/test_rest_client.py b/unittests/test_rest_client.py
+new file mode 100644
+--- /dev/null	(date 1695813453457)
++++ b/unittests/test_rest_client.py	(date 1695813453457)
+@@ -0,0 +1,43 @@
++import json
++import logging
++import unittest
++from unittest.mock import Mock, patch
++
++from requests import Response
++import requests
++
++from utils.logger import get_logger
++from utils.rest_client import RestClient
++
++LOGGER = get_logger(__name__, logging.DEBUG)
++
++
++class TestRestClient(unittest.TestCase):
++    def setUp(self):
++        self.rest_client = RestClient()
++        self.session = requests.Session()
++
++    def test_send_request_success(self):
++        response_mock = Mock(spec=Response)
++        response_mock.status_code = 200
++        with patch.object(requests.Session, "get", return_value=response_mock) as mock_get:
++            response = self.rest_client.send_request(method_name="get", session=self.session,
++                                                     url="https://www.google.com")
++            mock_get.assert_called_once_with('https://www.google.com', headers='', data=None)
++            self.assertEquals(response, response_mock)
++
++    def test_send_request_post(self):
++        response_mock = Mock(spec=Response)
++        response_mock.status_code = 200
++        body = {
++            "key": "value"
++        }
++        with patch.object(requests.Session, "post", return_value=response_mock) as mock_get:
++            response = self.rest_client.send_request(method_name="post", session=self.session,
++                                                     url="https://www.google.com", data=json.dumps(body))
++            mock_get.assert_called_once_with('https://www.google.com', headers='', data=json.dumps(body))
++            self.assertEquals(response, response_mock)
++
++    def test_send_request_invalid_method(self):
++        with self.assertRaises(AssertionError):
++            self.rest_client.send_request(method_name="put", session=self.session, url="https://www.google.com")
+Index: utils/rest_client.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/utils/rest_client.py b/utils/rest_client.py
+new file mode 100644
+--- /dev/null	(date 1695815124597)
++++ b/utils/rest_client.py	(date 1695815124597)
+@@ -0,0 +1,76 @@
++import logging
++
++import requests
++
++from config.config import TOKEN_TODO
++from utils.logger import get_logger
++from utils.singleton import Singleton
++
++LOGGER = get_logger(__name__, logging.DEBUG)
++
++
++class RestClient(metaclass=Singleton):
++    def send_request(self, method_name, session=None, url="", headers="", data=None):
++        methods = {
++            "get": session.get,
++            "post": session.post,
++            "delete": session.delete,
++        }
++        if method_name not in methods:
++            raise AssertionError("Invalid Method name")
++
++        LOGGER.info("Method name: %s", method_name)
++        LOGGER.info("Endpoint (URL): %s", url)
++        try:
++            response = methods[method_name](url, headers=headers, data=data)
++            response.raise_for_status()
++            LOGGER.info("Status code: %s,", response.status_code)
++            if hasattr(response, "request"):
++                LOGGER.debug("Request: %s,", response.request.headers)
++            LOGGER.debug("Response: %s", response.text)
++        except requests.exceptions.HTTPError as http_error:
++            LOGGER.error("HTTP error: %s", http_error)
++        except requests.exceptions.RequestException as request_error:
++            LOGGER.error("Request error: %s", request_error)
++
++        return response
++
++    def get(self, session, url_base, headers):
++        """
++
++        :param url_base:
++        :param headers:
++        :return:
++        """
++        return self.send_request("get", session, url_base, headers)
++
++    def post(self, session, url_base, headers, data):
++        """
++
++        :param url_base:
++        :param headers:
++        :param data:
++        :return:
++        """
++        return self.send_request("post", session, url_base, headers, data=data)
++
++    def delete(self, session, url_base, headers, data=None):
++        """
++
++        :param url_base:
++        :param headers:
++        :param data:
++        :return:
++        """
++        return self.send_request("delete", session, url_base, headers)
++
++
++if __name__ == '__main__':
++    rest_client = RestClient()
++    token = TOKEN_TODO
++    headers = {
++        "Authorization": f"Bearer {token}"
++    }
++    rest_client.send_request("get", session=requests.Session(),
++                             url="https://api.todoist.com/rest/v2/projects",
++                             headers=headers)
